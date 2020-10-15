@@ -246,7 +246,26 @@ function zoom_get_sessions_for_display($meetingid) {
         $uuid = $instance->uuid;
         $participantlist = zoom_get_participants_report($instance->id);
         $sessions[$uuid]['participants'] = $participantlist;
-        $sessions[$uuid]['count'] = count($participantlist);
+
+        // Looks first at uuids, userids, then emails to count unique participants.
+        $uniqueCount = 0;
+        $existingUuid = array_filter($participantlist, function($participant) {
+            return $participant->uuid;
+        });
+        $missingUuid = array_filter($participantlist, function($participant) {
+            return $participant->uuid === null;
+        });
+        $existingUserid = array_filter($participantlist, function($participant) {
+            return $participant->userid;
+        });
+        $missingUuidAndUserid = array_filter($participantlist, function($participant) {
+            return $participant->userid === null && $participant->uuid === null;
+        });
+        $uniqueCount += count(array_unique(array_filter(array_column($existingUuid, 'uuid'))));
+        $uniqueCount += count(array_unique(array_filter(array_diff(array_column($missingUuid, 'userid'), array_column($existingUuid, 'userid')))));
+        $uniqueCount += count(array_unique(array_filter(array_diff(array_column($missingUuidAndUserid, 'user_email'), array_column($existingUserid, 'user_email')))));
+
+        $sessions[$uuid]['count'] = $uniqueCount;
         $sessions[$uuid]['topic'] = $instance->topic;
         $sessions[$uuid]['duration'] = $instance->duration;
         $sessions[$uuid]['starttime'] = userdate($instance->start_time, $format);
